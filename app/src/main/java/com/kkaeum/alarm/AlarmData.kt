@@ -13,6 +13,7 @@ data class Alarm(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val hour: Int = 7, val minute: Int = 0, val days: Int = 31,
     val enabled: Boolean = true, val digits: Int = 1, val count: Int = 3,
+    @ColumnInfo(defaultValue = "''") val groupName: String = "",
     val quietSeconds: Int = 15, val vibrate: Boolean = true,
     @ColumnInfo(defaultValue = "'알람'") val name: String = "알람",
     @ColumnInfo(defaultValue = "''") val soundUri: String = "",
@@ -22,6 +23,7 @@ data class Alarm(
     @ColumnInfo(defaultValue = "5") val snoozeMinutes: Int = 5,
     @ColumnInfo(defaultValue = "3") val snoozeLimit: Int = 3,
 )
+@Entity(tableName = "pause_periods") data class PausePeriod(@PrimaryKey val start: String, val end: String)
 @Entity(tableName = "holidays") data class Holiday(@PrimaryKey val date: String, val name: String)
 @Entity(tableName = "holiday_years") data class HolidayYear(@PrimaryKey val year: Int, val updatedAt: Long, val source: String)
 @Entity(tableName = "date_rules") data class DateRule(@PrimaryKey val date: String, val force: Boolean)
@@ -30,6 +32,11 @@ data class Alarm(
 
 @Dao
 interface AlarmDao {
+    @Query("SELECT * FROM pause_periods ORDER BY start") fun pausesFlow(): Flow<List<PausePeriod>>
+    @Query("SELECT * FROM pause_periods ORDER BY start") suspend fun pauses(): List<PausePeriod>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putPause(period: PausePeriod)
+    @Query("DELETE FROM pause_periods WHERE start = :start") suspend fun deletePause(start: String)
+
     @Query("SELECT * FROM alarms ORDER BY hour, minute, id") fun observe(): Flow<List<Alarm>>
     @Query("SELECT * FROM alarms") suspend fun all(): List<Alarm>
     @Query("SELECT * FROM alarms WHERE id = :id") suspend fun find(id: Int): Alarm?
@@ -56,10 +63,16 @@ interface AlarmDao {
     @Query("DELETE FROM snoozes WHERE alarmId = :id") suspend fun clearSnooze(id: Int)
 }
 
-@Database(entities = [Alarm::class, Holiday::class, HolidayYear::class, DateRule::class, Scheduled::class, Snooze::class], version = 2, exportSchema = false)
+@Database(entities = [Alarm::class, Holiday::class, HolidayYear::class, DateRule::class, Scheduled::class, Snooze::class, PausePeriod::class], version = 3, exportSchema = false)
 abstract class AlarmDatabase : RoomDatabase() {
     abstract fun alarms(): AlarmDao
     companion object {
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE alarms ADD COLUMN groupName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("CREATE TABLE IF NOT EXISTS pause_periods (start TEXT NOT NULL PRIMARY KEY, end TEXT NOT NULL)")
+            }
+        }
         val MIGRATION = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 listOf("name TEXT NOT NULL DEFAULT '알람'", "soundUri TEXT NOT NULL DEFAULT ''",
@@ -76,7 +89,7 @@ abstract class AlarmDatabase : RoomDatabase() {
         @Volatile private var instance: AlarmDatabase? = null
         fun get(context: Context): AlarmDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(AlarmStorage.context(context), AlarmDatabase::class.java, "kkaeum.db")
-                .addMigrations(MIGRATION).build().also { instance = it }
+                .addMigrations(MIGRATION, MIGRATION_2_3).build().also { instance = it }
         }
     }
 }
@@ -86,7 +99,7 @@ data class NextOccurrence(val time: ZonedDateTime, val skipped: List<Skipped>)
 object NextAlarm {
     fun at(alarm: Alarm, now: ZonedDateTime): ZonedDateTime = calculate(alarm, now).time
     fun calculate(alarm: Alarm, now: ZonedDateTime, holidays: Map<String, String> = emptyMap(),
-        rules: Map<String, Boolean> = emptyMap()): NextOccurrence {
+        rules: Map<String, Boolean> = emptyMap(), pauses: List<PausePeriod> = emptyList()): NextOccurrence {
         require(alarm.hour in 0..23 && alarm.minute in 0..59 && alarm.days in 0..127)
         val skipped = mutableListOf<Skipped>()
         for (offset in 0..1095) {
@@ -97,6 +110,7 @@ object NextAlarm {
             val selected = alarm.days == 0 || alarm.days and (1 shl (date.dayOfWeek.value - 1)) != 0
             if (!selected && rules[key] != true) continue
             val reason = when {
+                pauses.any { key >= it.start && key <= it.end } -> "기간 건너뛰기"
                 alarm.skipDate == key -> "이번만 건너뛰기"
                 rules[key] == false -> "개인 휴일"
                 rules[key] == true -> null

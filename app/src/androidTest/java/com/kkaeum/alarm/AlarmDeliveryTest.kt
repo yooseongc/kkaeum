@@ -17,6 +17,8 @@ class AlarmDeliveryTest {
         val scheduler = AlarmScheduler(context)
         assumeTrue("Requires exact-alarm permission", scheduler.allowed())
         assumeTrue("Do not interrupt an existing alarm", RingService.state.value == null)
+        val historyPrefs=AlarmStorage.context(context).getSharedPreferences("alarm_history",Context.MODE_PRIVATE)
+        val priorHistory=historyPrefs.getString("events","[]")
         val dao = AlarmDatabase.get(context).alarms()
         val id = dao.put(Alarm(name = "[자동 검사]", enabled = false, count = 2, snoozeMinutes = 1,
             snoozeLimit = 1, vibrate = false)).toInt()
@@ -41,7 +43,13 @@ class AlarmDeliveryTest {
             }
             withTimeout(5000) { while (RingService.state.value != null) delay(100) }
             assertNull(dao.snooze(id))
+            val events=AlarmHistory.read(context).filter { it.key.startsWith("$id:") }
+            assertTrue(events.any { it.action=="알람 수신" })
+            assertTrue(events.any { it.action=="울림 시작" })
+            assertTrue(events.any { it.action=="미션 완료" })
+            assertTrue(events.any { it.action.contains("뒤 다시 울림") })
         } finally {
+            historyPrefs.edit().putString("events",priorHistory).commit(); AlarmHistory.revision.value++
             if (RingService.state.value?.alarm?.id == id) withContext(Dispatchers.Main) {
                 while (RingService.state.value?.alarm?.id == id) RingService.instance?.submit(RingService.state.value!!.problem.answer)
             }

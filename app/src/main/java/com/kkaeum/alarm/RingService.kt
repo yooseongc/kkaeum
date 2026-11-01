@@ -68,6 +68,7 @@ class RingService : Service() {
         mission = MathMission(next.alarm.count, next.alarm.digits).also { m ->
             if (saved != null && saved.left != 0) m.restore(saved.completed, saved.left, saved.right)
         }
+        if (!next.preview) AlarmHistory.record(this, key + ":started", next.alarm.name, saved?.due ?: 0, "울림 시작")
         if (!next.preview) RingStore.progress(this, key, mission!!)
         if (wakeLock?.isHeld != true) wakeLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kkaeum:mission").apply { acquire(60 * 60 * 1000L) }
@@ -98,7 +99,10 @@ class RingService : Service() {
         val m = mission ?: return
         interact()
         if (value == null || !m.submit(value)) { publish(true, "다시 계산해 보세요"); return }
-        if (m.finished) finishCurrent() else publish(true)
+        if (m.finished) {
+            if (request?.preview == false) AlarmHistory.record(this, key + ":completed", request!!.alarm.name, 0, "미션 완료")
+            finishCurrent()
+        } else publish(true)
     }
     fun stopPreview() { if (request?.preview == true) finishCurrent() }
     fun snooze() {
@@ -112,8 +116,9 @@ class RingService : Service() {
                     AlarmScheduler(this@RingService).snooze(Snooze(r.alarm.id,
                         System.currentTimeMillis() + r.alarm.snoozeMinutes * 60_000L, r.used + 1))
                 }
+                AlarmHistory.record(this@RingService, key + ":snoozed", r.alarm.name, 0, "${r.alarm.snoozeMinutes}분 뒤 다시 울림")
                 finishCurrent()
-            } catch (e: Exception) { publish(mutableState.value?.quiet ?: false, "다시 울림을 예약하지 못했어요. 알람 권한을 확인해 주세요.") }
+            } catch (e: Exception) { publish(mutableState.value?.quiet ?: false, if (e.message == "기간 건너뛰기 중에는 다시 울림을 예약할 수 없습니다") e.message!! else "다시 울림을 예약하지 못했어요. 알람 권한을 확인해 주세요.") }
             finally { snoozing = false }
         }
     }

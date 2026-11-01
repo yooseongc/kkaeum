@@ -20,11 +20,14 @@ class DeviceDataTest {
             db.execSQL("INSERT INTO alarms VALUES (42, 8, 35, 31, 1, 2, 4, 20, 1)")
             db.version = 1
         }
-        val db = Room.databaseBuilder(context, AlarmDatabase::class.java, filename).addMigrations(AlarmDatabase.MIGRATION).build()
+        val db = Room.databaseBuilder(context, AlarmDatabase::class.java, filename).addMigrations(AlarmDatabase.MIGRATION, AlarmDatabase.MIGRATION_2_3).build()
         try {
             val alarm = db.alarms().find(42)!!
             assertEquals(8, alarm.hour); assertEquals(35, alarm.minute); assertEquals(2, alarm.digits)
             assertEquals(4, alarm.count); assertEquals("기본 알람음", alarm.soundName)
+            assertEquals("",alarm.groupName)
+            db.alarms().putPause(PausePeriod("2026-12-01","2026-12-02"))
+            assertEquals(1,db.alarms().pauses().size)
             assertFalse(alarm.skipHolidays); assertEquals(3, alarm.snoozeLimit)
             db.alarms().putRule(DateRule("2026-12-25", true))
             assertEquals(true, db.alarms().rules().single().force)

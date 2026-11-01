@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable fun SettingsScreen(options: AppOptions, appearance: (AppOptions) -> Unit,
-    calendar: () -> Unit, check: () -> Unit, back: () -> Unit) {
+    manage: (String) -> Unit, calendar: () -> Unit, check: () -> Unit, back: () -> Unit) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = back) { Text("← 알람 목록") }
         Text("설정", style = MaterialTheme.typography.headlineMedium)
@@ -18,6 +18,13 @@ import androidx.compose.ui.unit.dp
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             SettingCard("알람") {
                 OutlinedButton(onClick = check, shape = MaterialTheme.shapes.medium) { Text("알람 점검") }
+            }
+            SettingCard("알람 관리") {
+                FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    listOf("groups" to "알람 그룹", "periods" to "기간 건너뛰기", "backup" to "백업 · 복원", "history" to "울림 기록").forEach { (mode,title) ->
+                        OutlinedButton(onClick={manage(mode)},shape=MaterialTheme.shapes.medium) { Text(title) }
+                    }
+                }
             }
             SettingCard("화면 테마") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
