@@ -33,6 +33,7 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
     fun save(alarm: Alarm, saved: (Alarm) -> Unit = {}) { viewModelScope.launch {
         try { AlarmMutations.mutex.withLock {
             require(alarm.hour in 0..23 && alarm.minute in 0..59 && alarm.count in 1..10 && alarm.digits in 1..2)
+            require(alarm.missionType in MissionTypes.names && alarm.missionLevel in 1..3 && alarm.choiceKind in MissionTypes.choices)
             if (alarm.enabled) check(scheduler.allowed()) { "정확한 알람 권한을 먼저 허용해 주세요." }
             val clean = alarm.copy(name = alarm.name.trim().ifEmpty { "알람" }, groupName = alarm.groupName.trim().take(24))
             val id = dao.put(clean).toInt()

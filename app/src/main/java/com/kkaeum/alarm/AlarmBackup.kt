@@ -14,7 +14,7 @@ object AlarmBackup {
         val dao=db.alarms()
         val options=AppPreferences.read(context)
         return db.withTransaction {
-            JSONObject().put("format","kkaeum").put("version",1)
+            JSONObject().put("format","kkaeum").put("version",2)
                 .put("alarms",JSONArray().also { a -> dao.all().forEach { a.put(JSONObject(AlarmCodec.encode(it))) } })
                 .put("rules",JSONArray().also { a -> dao.rules().forEach { a.put(JSONObject().put("date",it.date).put("force",it.force)) } })
                 .put("pauses",JSONArray().also { a -> dao.pauses().forEach { a.put(JSONObject().put("start",it.start).put("end",it.end)) } })
@@ -24,14 +24,14 @@ object AlarmBackup {
     fun parse(text: String): BackupData {
         require(text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) { "백업 파일이 너무 큽니다" }
         val root=JSONObject(text)
-        require(root.getString("format")=="kkaeum" && root.getInt("version")==1) { "지원하지 않는 백업 형식입니다" }
+        require(root.getString("format")=="kkaeum" && root.getInt("version") in 1..2) { "지원하지 않는 백업 형식입니다" }
         val alarms=root.getJSONArray("alarms"); val rules=root.getJSONArray("rules"); val pauses=root.getJSONArray("pauses")
         require(alarms.length()<=200 && rules.length()<=2000 && pauses.length()<=100) { "백업 항목이 너무 많습니다" }
         val rows=(0 until alarms.length()).map {
             val a=AlarmCodec.decode(alarms.getJSONObject(it).toString())
             require(a.hour in 0..23 && a.minute in 0..59 && a.days in 0..127 && a.digits in 1..2 && a.count in 1..10 &&
                 a.quietSeconds in 10..60 && a.snoozeMinutes in listOf(1,3,5,10,15) && a.snoozeLimit in 0..5 &&
-                a.name.length<=40 && a.groupName.length<=24 && a.soundUri.length<=4096)
+                a.missionType in MissionTypes.names && a.missionLevel in 1..3 && a.choiceKind in MissionTypes.choices && a.name.length<=40 && a.groupName.length<=24 && a.soundUri.length<=4096)
             if (a.skipDate.isNotEmpty()) require(LocalDate.parse(a.skipDate).toString()==a.skipDate)
             val sound=AlarmSounds.builtins.firstOrNull { it.uri==a.soundUri }
             a.copy(id=0,enabled=false,groupName=a.groupName.trim(),soundUri=sound?.uri ?: "",soundName=sound?.title ?: "기본 알람음")

@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
             val holidays by vm.holidays.collectAsStateWithLifecycle()
             val pauses by vm.pauses.collectAsStateWithLifecycle()
             var management by rememberSaveable { mutableStateOf<String?>(null) }
+            var missionPreviewConfig by rememberSaveable { mutableStateOf<String?>(null) }
             val rules by vm.rules.collectAsStateWithLifecycle()
             val years by vm.years.collectAsStateWithLifecycle()
             val snoozes by vm.snoozes.collectAsStateWithLifecycle()
@@ -162,7 +163,7 @@ class MainActivity : ComponentActivity() {
                                                             }
                                                         }
                                                     }
-                                                    Text("${dayLabel(a.days)} · ${a.digits}자리 덧셈 ${a.count}문제", style = MaterialTheme.typography.bodySmall)
+                                                    Text("${dayLabel(a.days)} · ${MissionTypes.summary(a)}", style = MaterialTheme.typography.bodySmall)
                                                     if (a.enabled) {
                                                         Text("다음: " + nextLabel(occurrence.time, now, options), style = MaterialTheme.typography.bodySmall)
                                                         occurrence.skipped.firstOrNull()?.let { Text("${it.date} · ${it.reason} 건너뜀", style = MaterialTheme.typography.bodySmall, color = Muted) }
@@ -194,7 +195,8 @@ class MainActivity : ComponentActivity() {
                                                 startForegroundService(Intent(this@MainActivity, RingService::class.java).putExtra("config", AlarmCodec.encode(a)).putExtra("preview", true))
                                                 startActivity(Intent(this@MainActivity, MissionActivity::class.java))
                                             }.onFailure { vm.message.value = "미리보기를 열지 못했어요. 다시 시도해 주세요." }
-                                        }, report = { vm.message.value = it }, canSave = ready)
+                                        }, report = { vm.message.value = it }, canSave = ready,
+                                            previewMission = { missionPreviewConfig = AlarmCodec.encode(it) })
                                     }
                                 }
                             }
@@ -216,6 +218,7 @@ class MainActivity : ComponentActivity() {
                 }
                 }
                 ManagementDialogs(management, { management=null }, vm)
+                missionPreviewConfig?.let { config -> MissionPreview(AlarmCodec.decode(config)) { missionPreviewConfig = null } }
                 if (checkOpen) AlarmCheckDialog(check,
                     exactAction = { startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName"))) },
                     notificationAction = { startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) },

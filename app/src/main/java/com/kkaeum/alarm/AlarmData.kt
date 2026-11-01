@@ -6,7 +6,6 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import java.time.*
-import kotlin.random.Random
 
 @Entity(tableName = "alarms")
 data class Alarm(
@@ -14,6 +13,9 @@ data class Alarm(
     val hour: Int = 7, val minute: Int = 0, val days: Int = 31,
     val enabled: Boolean = true, val digits: Int = 1, val count: Int = 3,
     @ColumnInfo(defaultValue = "''") val groupName: String = "",
+    @ColumnInfo(defaultValue = "'math'") val missionType: String = "math",
+    @ColumnInfo(defaultValue = "1") val missionLevel: Int = 1,
+    @ColumnInfo(defaultValue = "'mixed'") val choiceKind: String = "mixed",
     val quietSeconds: Int = 15, val vibrate: Boolean = true,
     @ColumnInfo(defaultValue = "'알람'") val name: String = "알람",
     @ColumnInfo(defaultValue = "''") val soundUri: String = "",
@@ -63,10 +65,17 @@ interface AlarmDao {
     @Query("DELETE FROM snoozes WHERE alarmId = :id") suspend fun clearSnooze(id: Int)
 }
 
-@Database(entities = [Alarm::class, Holiday::class, HolidayYear::class, DateRule::class, Scheduled::class, Snooze::class, PausePeriod::class], version = 3, exportSchema = false)
+@Database(entities = [Alarm::class, Holiday::class, HolidayYear::class, DateRule::class, Scheduled::class, Snooze::class, PausePeriod::class], version = 4, exportSchema = false)
 abstract class AlarmDatabase : RoomDatabase() {
     abstract fun alarms(): AlarmDao
     companion object {
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE alarms ADD COLUMN missionType TEXT NOT NULL DEFAULT 'math'")
+                db.execSQL("ALTER TABLE alarms ADD COLUMN missionLevel INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE alarms ADD COLUMN choiceKind TEXT NOT NULL DEFAULT 'mixed'")
+            }
+        }
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE alarms ADD COLUMN groupName TEXT NOT NULL DEFAULT ''")
@@ -89,7 +98,7 @@ abstract class AlarmDatabase : RoomDatabase() {
         @Volatile private var instance: AlarmDatabase? = null
         fun get(context: Context): AlarmDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(AlarmStorage.context(context), AlarmDatabase::class.java, "kkaeum.db")
-                .addMigrations(MIGRATION, MIGRATION_2_3).build().also { instance = it }
+                .addMigrations(MIGRATION, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
         }
     }
 }
@@ -121,28 +130,5 @@ object NextAlarm {
             return NextOccurrence(candidate, skipped)
         }
         error("향후 3년 안에 실행할 날짜가 없습니다.")
-    }
-}
-
-data class SumProblem(val left: Int, val right: Int) { val answer get() = left + right }
-class MathMission(val total: Int, val digits: Int, private val random: Random = Random.Default) {
-    init { require(total in 1..10); require(digits in 1..2) }
-    var completed = 0; private set
-    var problem = next(); private set
-    val finished get() = completed >= total
-    fun submit(answer: Int): Boolean {
-        if (finished || answer != problem.answer) return false
-        completed++
-        if (!finished) problem = next()
-        return true
-    }
-    fun restore(completed: Int, left: Int, right: Int) {
-        val range = if (digits == 1) 1..9 else 10..99
-        require(completed in 0 until total && left in range && right in range)
-        this.completed = completed; problem = SumProblem(left, right)
-    }
-    private fun next(): SumProblem {
-        val range = if (digits == 1) 1..9 else 10..99
-        return SumProblem(random.nextInt(range.first, range.last + 1), random.nextInt(range.first, range.last + 1))
     }
 }
