@@ -24,7 +24,7 @@ class AlarmScheduler(private val context: Context) {
         manager.setAlarmClock(AlarmManager.AlarmClockInfo(trigger, show), operation(id, snooze, due))
     }
     suspend fun next(alarm: Alarm, now: ZonedDateTime = ZonedDateTime.now()) = NextAlarm.calculate(alarm, now,
-        dao.holidays().associate { it.date to it.name }, dao.rules().associate { it.date to it.force })
+        dao.holidays().associate { it.date to it.name }, dao.rules().associate { it.date to it.force }, dao.pauses())
     suspend fun schedule(alarm: Alarm) {
         if (!alarm.enabled) { cancelRegular(alarm.id); return }
         val due = next(alarm).time.toInstant().toEpochMilli()
@@ -32,6 +32,8 @@ class AlarmScheduler(private val context: Context) {
         scheduleAt(alarm.id, due, false)
     }
     suspend fun snooze(row: Snooze) {
+        val date=java.time.Instant.ofEpochMilli(row.due).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
+        check(dao.pauses().none { date >= it.start && date <= it.end }) { "기간 건너뛰기 중에는 다시 울림을 예약할 수 없습니다" }
         dao.putSnooze(row); scheduleAt(row.alarmId, row.due, true)
     }
     suspend fun cancelRegular(id: Int) {
@@ -61,6 +63,7 @@ class AlarmScheduler(private val context: Context) {
             val pending = dao.scheduled(alarm.id)
             when {
                 !alarm.enabled -> cancelRegular(alarm.id)
+                recalculate -> schedule(alarm)
                 pending != null && pending.due <= now -> {
                     when {
                         now - pending.due <= 15 * 60_000 -> scheduleAt(alarm.id, pending.due, false, now + 2000)
@@ -97,6 +100,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 if (System.currentTimeMillis() + 1000 < due) return@withLock
                 val saved = SavedRing("$id:$due:$isSnooze", alarm, snooze?.used ?: 0, due, isSnooze)
                 RingStore.add(context, saved)
+                AlarmHistory.record(context, saved.key + ":received", alarm.name, due, "알람 수신")
                 RingRecovery.arm(context)
                 AlarmScheduler(context).consume(saved)
                 context.startForegroundService(Intent(context, RingService::class.java))

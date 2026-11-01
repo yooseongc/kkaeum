@@ -6,9 +6,9 @@ import java.util.Locale
 
 data class UpcomingAlarm(val alarm: Alarm, val time: ZonedDateTime, val snooze: Boolean)
 fun upcomingAlarm(alarms: List<Alarm>, snoozes: List<Snooze>, now: ZonedDateTime,
-    holidays: Map<String, String>, rules: Map<String, Boolean>): UpcomingAlarm? {
+    holidays: Map<String, String>, rules: Map<String, Boolean>, pauses: List<PausePeriod> = emptyList()): UpcomingAlarm? {
     val regular = alarms.filter { it.enabled }.map {
-        UpcomingAlarm(it, NextAlarm.calculate(it, now, holidays, rules).time, false)
+        UpcomingAlarm(it, NextAlarm.calculate(it, now, holidays, rules, pauses).time, false)
     }
     val pending = snoozes.mapNotNull { s ->
         val alarm = alarms.find { it.id == s.alarmId } ?: return@mapNotNull null

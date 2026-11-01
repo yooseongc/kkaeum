@@ -89,6 +89,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
                     Wheel(alarm.minute, 59, "분 선택") { changed(alarm.copy(minute = it)) }
                 }
                 OutlinedTextField(alarm.name, { changed(alarm.copy(name = it.take(40))) }, label = { Text("알람 이름") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(alarm.groupName, { changed(alarm.copy(groupName=it.take(24))) }, label={ Text("그룹") }, placeholder={ Text("미지정") }, singleLine=true, modifier=Modifier.fillMaxWidth())
                 FlowRow(maxItemsInEachRow = daysPerRow, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("월","화","수","목","금","토","일").forEachIndexed { index, label ->
                         FilterChip(alarm.days and (1 shl index) != 0, { changed(alarm.copy(days = alarm.days xor (1 shl index), skipDate = "")) }, label = { Text(label) })

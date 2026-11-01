@@ -45,6 +45,8 @@ class MainActivity : ComponentActivity() {
             val options = appOptions()
             val alarms by vm.alarms.collectAsStateWithLifecycle()
             val holidays by vm.holidays.collectAsStateWithLifecycle()
+            val pauses by vm.pauses.collectAsStateWithLifecycle()
+            var management by rememberSaveable { mutableStateOf<String?>(null) }
             val rules by vm.rules.collectAsStateWithLifecycle()
             val years by vm.years.collectAsStateWithLifecycle()
             val snoozes by vm.snoozes.collectAsStateWithLifecycle()
@@ -89,8 +91,8 @@ class MainActivity : ComponentActivity() {
             }
             val holidayMap = remember(holidays) { holidays.associate { it.date to it.name } }
             val ruleMap = remember(rules) { rules.associate { it.date to it.force } }
-            fun next(a: Alarm) = NextAlarm.calculate(a, now, holidayMap, ruleMap)
-            val upcoming = upcomingAlarm(alarms, snoozes, now, holidayMap, ruleMap)
+            fun next(a: Alarm) = NextAlarm.calculate(a, now, holidayMap, ruleMap, pauses)
+            val upcoming = upcomingAlarm(alarms, snoozes, now, holidayMap, ruleMap, pauses)
             KkaeumTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -142,6 +144,7 @@ class MainActivity : ComponentActivity() {
                                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                                         Column(Modifier.weight(1f)) {
                                                             Text(a.name, color = Muted)
+                                                            if(a.groupName.isNotEmpty()) Text(a.groupName, style=MaterialTheme.typography.labelSmall, color=Muted)
                                                             Text(displayTime(LocalTime.of(a.hour, a.minute), options), color = if (a.enabled) Ink else Muted,
                                                                 style = MaterialTheme.typography.headlineLarge)
                                                         }
@@ -200,7 +203,7 @@ class MainActivity : ComponentActivity() {
                                     SettingsScreen(options, appearance = {
                                         runCatching { AppPreferences.appearance(this@MainActivity, it) }
                                             .onFailure { vm.message.value = "설정을 저장하지 못했어요. 다시 시도해 주세요." }
-                                    }, calendar = { calendar = true }, check = { checkOpen = true }, back = { choose("LIST") })
+                                    }, manage = { vm.message.value=""; management=it }, calendar = { calendar = true }, check = { checkOpen = true }, back = { choose("LIST") })
                                 }
                             } else if (wide && showEditor) Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                                 Box(Modifier.width(300.dp).fillMaxHeight()) { list() }
@@ -212,6 +215,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 }
+                ManagementDialogs(management, { management=null }, vm)
                 if (checkOpen) AlarmCheckDialog(check,
                     exactAction = { startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName"))) },
                     notificationAction = { startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) },
