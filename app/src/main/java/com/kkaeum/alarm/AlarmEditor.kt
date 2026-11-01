@@ -24,7 +24,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable fun AlarmEditor(alarm: Alarm, changed: (Alarm) -> Unit, save: () -> Unit,
-    test: () -> Unit, report: (String) -> Unit, canSave: Boolean) {
+    test: () -> Unit, report: (String) -> Unit, canSave: Boolean, previewMission: (Alarm) -> Unit) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val audio = remember { AlarmAudio(context) }
@@ -130,14 +130,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
                 }
             }
             val missionSection: @Composable () -> Unit = {
-            SettingCard("수학 미션") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    (1..2).forEach { digits -> FilterChip(alarm.digits == digits, { changed(alarm.copy(digits = digits)) }, label = { Text("${digits}자리 덧셈") }) }
-                }
-                Stepper("문제 수", alarm.count, 1..10, "문제") { changed(alarm.copy(count = it)) }
-                Text("입력이 없으면 ${alarm.quietSeconds}초 후 다시 울림", color = Muted)
-                Slider(alarm.quietSeconds.toFloat(), { changed(alarm.copy(quietSeconds = (it / 5).toInt() * 5)) }, valueRange = 10f..60f, steps = 9)
-            }
+                MissionSettings(alarm, changed) { audio.stop(); playing = false; previewMission(alarm) }
             }
             val snoozeSection: @Composable () -> Unit = {
             SettingCard("다시 울림") {

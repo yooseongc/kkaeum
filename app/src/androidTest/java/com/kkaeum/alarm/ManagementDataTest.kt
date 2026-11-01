@@ -49,7 +49,7 @@ class ManagementDataTest {
                     override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion:Int,newVersion:Int) { AlarmDatabase.MIGRATION.migrate(db) }
                 }).build())
         helper.writableDatabase.execSQL("INSERT INTO date_rules VALUES ('2027-01-01',0)"); helper.close()
-        val db=Room.databaseBuilder(context,AlarmDatabase::class.java,filename).addMigrations(AlarmDatabase.MIGRATION_2_3).build()
+        val db=Room.databaseBuilder(context,AlarmDatabase::class.java,filename).addMigrations(AlarmDatabase.MIGRATION_2_3, AlarmDatabase.MIGRATION_3_4).build()
         try { assertEquals(30,db.alarms().find(42)!!.minute); assertEquals("",db.alarms().find(42)!!.groupName)
             assertEquals(false,db.alarms().rules().single().force); assertTrue(db.alarms().pauses().isEmpty())
         } finally { db.close(); context.deleteDatabase(filename) }

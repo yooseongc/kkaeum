@@ -12,6 +12,10 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AlarmDeliveryTest {
+    private fun currentAnswer(): Int {
+        val state = RingService.state.value!!
+        return (MissionFactory.create(state.alarm, state.missionState) as SumSession).math.problem.answer
+    }
     @Test fun exactDeliverySnoozeAndMissionCompletion() = runBlocking {
         val context: Context = ApplicationProvider.getApplicationContext()
         val scheduler = AlarmScheduler(context)
@@ -39,7 +43,7 @@ class AlarmDeliveryTest {
                 assertTrue(RingService.state.value!!.quiet)
                 service.snooze() // Limit reached: must keep the alarm active.
                 assertNotNull(RingService.state.value)
-                repeat(2) { service.submit(RingService.state.value!!.problem.answer) }
+                repeat(2) { service.submit(currentAnswer()) }
             }
             withTimeout(5000) { while (RingService.state.value != null) delay(100) }
             assertNull(dao.snooze(id))
@@ -51,7 +55,7 @@ class AlarmDeliveryTest {
         } finally {
             historyPrefs.edit().putString("events",priorHistory).commit(); AlarmHistory.revision.value++
             if (RingService.state.value?.alarm?.id == id) withContext(Dispatchers.Main) {
-                while (RingService.state.value?.alarm?.id == id) RingService.instance?.submit(RingService.state.value!!.problem.answer)
+                while (RingService.state.value?.alarm?.id == id) RingService.instance?.submit(currentAnswer())
             }
             AlarmMutations.mutex.withLock { scheduler.cancel(id); dao.delete(id) }
         }

@@ -20,7 +20,7 @@ class DeviceDataTest {
             db.execSQL("INSERT INTO alarms VALUES (42, 8, 35, 31, 1, 2, 4, 20, 1)")
             db.version = 1
         }
-        val db = Room.databaseBuilder(context, AlarmDatabase::class.java, filename).addMigrations(AlarmDatabase.MIGRATION, AlarmDatabase.MIGRATION_2_3).build()
+        val db = Room.databaseBuilder(context, AlarmDatabase::class.java, filename).addMigrations(AlarmDatabase.MIGRATION, AlarmDatabase.MIGRATION_2_3, AlarmDatabase.MIGRATION_3_4).build()
         try {
             val alarm = db.alarms().find(42)!!
             assertEquals(8, alarm.hour); assertEquals(35, alarm.minute); assertEquals(2, alarm.digits)

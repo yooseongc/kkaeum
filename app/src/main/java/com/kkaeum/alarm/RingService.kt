@@ -10,14 +10,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
-data class RingState(val key: String, val alarm: Alarm, val problem: SumProblem, val completed: Int,
-    val total: Int, val preview: Boolean, val used: Int, val quiet: Boolean = false, val message: String = "")
+data class RingState(val key: String, val alarm: Alarm, val completed: Int,
+    val total: Int, val preview: Boolean, val used: Int, val quiet: Boolean = false, val message: String = "", val missionState: String = "")
 private data class RingRequest(val alarm: Alarm, val preview: Boolean, val used: Int)
 
 class RingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var request: RingRequest? = null
-    private var mission: MathMission? = null
+    private var mission: MissionSession? = null
     private var key = ""
     
     private var timeout: Job? = null
@@ -59,15 +59,13 @@ class RingService : Service() {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL).setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("깨움 · 알람").setContentText("수학 미션을 완료하면 알람이 꺼집니다")
+            .setContentTitle("깨움 · 알람").setContentText("미션을 완료하면 알람이 꺼집니다")
             .setCategory(Notification.CATEGORY_ALARM).setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true).setContentIntent(open).setFullScreenIntent(open, true).build()
     }
     private fun begin(next: RingRequest, saved: SavedRing? = null) {
         request = next; key = saved?.key ?: UUID.randomUUID().toString()
-        mission = MathMission(next.alarm.count, next.alarm.digits).also { m ->
-            if (saved != null && saved.left != 0) m.restore(saved.completed, saved.left, saved.right)
-        }
+        mission = MissionFactory.create(next.alarm, saved?.progressSnapshot().orEmpty())
         if (!next.preview) AlarmHistory.record(this, key + ":started", next.alarm.name, saved?.due ?: 0, "울림 시작")
         if (!next.preview) RingStore.progress(this, key, mission!!)
         if (wakeLock?.isHeld != true) wakeLock = getSystemService(PowerManager::class.java)
@@ -79,7 +77,7 @@ class RingService : Service() {
     private fun publish(quiet: Boolean, message: String = "") {
         val r = request ?: return; val m = mission ?: return
         if (!r.preview && !m.finished) RingStore.progress(this, key, m)
-        mutableState.value = RingState(key, r.alarm, m.problem, m.completed, m.total, r.preview, r.used, quiet, message)
+        mutableState.value = RingState(key, r.alarm, m.completed, m.total, r.preview, r.used, quiet, message, m.snapshot())
     }
     private fun ring() {
         timeout?.cancel(); publish(false)
@@ -95,10 +93,12 @@ class RingService : Service() {
         audio.stop(); vibrator.cancel(); timeout?.cancel(); publish(true)
         timeout = scope.launch { delay((request?.alarm?.quietSeconds ?: 15) * 1000L); ring() }
     }
-    fun submit(value: Int?) {
+    fun submit(value: Int?) = act(MissionAction.Answer(value))
+    fun select(index: Int) = act(MissionAction.Select(index))
+    private fun act(action: MissionAction) {
         val m = mission ?: return
         interact()
-        if (value == null || !m.submit(value)) { publish(true, "다시 계산해 보세요"); return }
+        if (!m.accept(action)) { publish(true, m.message); return }
         if (m.finished) {
             if (request?.preview == false) AlarmHistory.record(this, key + ":completed", request!!.alarm.name, 0, "미션 완료")
             finishCurrent()

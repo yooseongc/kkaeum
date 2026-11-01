@@ -24,7 +24,9 @@ object AlarmStorage {
 }
 
 data class SavedRing(val key: String, val alarm: Alarm, val used: Int, val due: Long,
-    val snooze: Boolean, val completed: Int = 0, val left: Int = 0, val right: Int = 0)
+    val snooze: Boolean, val completed: Int = 0, val left: Int = 0, val right: Int = 0, val missionState: String = "") {
+    fun progressSnapshot() = missionState.ifEmpty { if (left != 0) "sum|$completed|$left|$right" else "" }
+}
 
 /** Synchronous commits make delivery and mission progress durable before the next action. */
 object RingStore {
@@ -34,14 +36,14 @@ object RingStore {
         return (0 until array.length()).map { index ->
             val o = array.getJSONObject(index)
             SavedRing(o.getString("key"), AlarmCodec.decode(o.getString("alarm")), o.getInt("used"),
-                o.getLong("due"), o.getBoolean("snooze"), o.optInt("completed"), o.optInt("left"), o.optInt("right"))
+                o.getLong("due"), o.getBoolean("snooze"), o.optInt("completed"), o.optInt("left"), o.optInt("right"), o.optString("missionState", ""))
         }
     }
     private fun write(context: Context, rows: List<SavedRing>) {
         val array = JSONArray()
         rows.forEach { r -> array.put(JSONObject().put("key", r.key).put("alarm", AlarmCodec.encode(r.alarm))
             .put("used", r.used).put("due", r.due).put("snooze", r.snooze).put("completed", r.completed)
-            .put("left", r.left).put("right", r.right)) }
+            .put("missionState", r.missionState).put("left", r.left).put("right", r.right)) }
         check(prefs(context).edit().putString("rings", array.toString()).commit()) { "알람 진행 상태를 저장하지 못했습니다." }
     }
     @Synchronized fun add(context: Context, row: SavedRing) {
@@ -51,6 +53,10 @@ object RingStore {
     @Synchronized fun progress(context: Context, key: String, m: MathMission) {
         write(context, read(context).map { if (it.key == key) it.copy(completed = m.completed,
             left = m.problem.left, right = m.problem.right) else it })
+    }
+    @Synchronized fun progress(context: Context, key: String, session: MissionSession) {
+        write(context, read(context).map { if (it.key == key) it.copy(completed = session.completed,
+            missionState = session.snapshot()) else it })
     }
     @Synchronized fun remove(context: Context, key: String) { write(context, read(context).filterNot { it.key == key }) }
 }
