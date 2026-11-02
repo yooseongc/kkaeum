@@ -1,3 +1,15 @@
+## 1.2.1 — 2026-11-02
+
+- versionCode 12 / versionName 1.2.1.
+- 다시 울림 1~10회·무제한, 울림 화면 표시 및 백업 검증 반영.
+- assembleDebug / assembleDebugAndroidTest / testDebugUnitTest / lintDebug 성공.
+- JVM 39개 통과. 10회 경계, 기존 3회 제한, 사용 안 함, 무제한 및 횟수 오버플로 검사 포함.
+- Galaxy Tab S8+ (SM-X800) 무선 업데이트 설치 성공. 기존 알람·날짜 예외·다시 울림·기간 설정 전후 동일.
+- 태블릿 SnoozeBackupTest 1개 통과: -1(무제한), 0, 3, 5, 10 직렬화·백업 복원 및 잘못된 값 거부.
+- 이번 패치에서 실제 10회 연속 미루기, 재부팅·장시간 절전 및 UI 수동 검사는 수행하지 않음.
+
+---
+
 # 1.2.0 기능 점검
 
 2026-11-01, SM-S911N / Android 16, 1080×2340, 설정 밀도 450. 공개 APK는 versionCode 11.

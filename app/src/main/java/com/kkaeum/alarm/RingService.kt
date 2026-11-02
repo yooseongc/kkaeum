@@ -107,14 +107,14 @@ class RingService : Service() {
     fun stopPreview() { if (request?.preview == true) finishCurrent() }
     fun snooze() {
         val r = request ?: return
-        if (r.preview || r.used >= r.alarm.snoozeLimit || snoozing) return
+        if (r.preview || !SnoozePolicy.canSnooze(r.alarm.snoozeLimit, r.used) || snoozing) return
         snoozing = true
         scope.launch {
             try {
                 AlarmMutations.mutex.withLock {
                     check(AlarmDatabase.get(this@RingService).alarms().find(r.alarm.id) != null) { "삭제된 알람입니다." }
                     AlarmScheduler(this@RingService).snooze(Snooze(r.alarm.id,
-                        System.currentTimeMillis() + r.alarm.snoozeMinutes * 60_000L, r.used + 1))
+                        System.currentTimeMillis() + r.alarm.snoozeMinutes * 60_000L, SnoozePolicy.nextUsed(r.used)))
                 }
                 AlarmHistory.record(this@RingService, key + ":snoozed", r.alarm.name, 0, "${r.alarm.snoozeMinutes}분 뒤 다시 울림")
                 finishCurrent()

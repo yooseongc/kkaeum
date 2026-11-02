@@ -30,7 +30,7 @@ object AlarmBackup {
         val rows=(0 until alarms.length()).map {
             val a=AlarmCodec.decode(alarms.getJSONObject(it).toString())
             require(a.hour in 0..23 && a.minute in 0..59 && a.days in 0..127 && a.digits in 1..2 && a.count in 1..10 &&
-                a.quietSeconds in 10..60 && a.snoozeMinutes in listOf(1,3,5,10,15) && a.snoozeLimit in 0..5 &&
+                a.quietSeconds in 10..60 && a.snoozeMinutes in listOf(1,3,5,10,15) && SnoozePolicy.isValid(a.snoozeLimit) &&
                 a.missionType in MissionTypes.names && a.missionLevel in 1..3 && a.choiceKind in MissionTypes.choices && a.name.length<=40 && a.groupName.length<=24 && a.soundUri.length<=4096)
             if (a.skipDate.isNotEmpty()) require(LocalDate.parse(a.skipDate).toString()==a.skipDate)
             val sound=AlarmSounds.builtins.firstOrNull { it.uri==a.soundUri }

@@ -134,12 +134,17 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
             }
             val snoozeSection: @Composable () -> Unit = {
             SettingCard("다시 울림") {
-                ToggleRow("사용", null, alarm.snoozeLimit > 0) { changed(alarm.copy(snoozeLimit = if (it) 3 else 0)) }
-                if (alarm.snoozeLimit > 0) {
+                ToggleRow("사용", null, alarm.snoozeLimit != 0) { changed(alarm.copy(snoozeLimit = if (it) 3 else 0)) }
+                if (alarm.snoozeLimit != 0) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(1, 3, 5, 10, 15).forEach { m -> FilterChip(alarm.snoozeMinutes == m, { changed(alarm.copy(snoozeMinutes = m)) }, label = { Text("${m}분") }) }
                     }
-                    Stepper("최대 횟수", alarm.snoozeLimit, 1..5, "회") { changed(alarm.copy(snoozeLimit = it)) }
+                    ToggleRow("무제한", null, alarm.snoozeLimit == SnoozePolicy.UNLIMITED) {
+                        changed(alarm.copy(snoozeLimit = if (it) SnoozePolicy.UNLIMITED else 3))
+                    }
+                    if (alarm.snoozeLimit != SnoozePolicy.UNLIMITED) {
+                        Stepper("최대 횟수", alarm.snoozeLimit, 1..SnoozePolicy.MAX_LIMIT, "회") { changed(alarm.copy(snoozeLimit = it)) }
+                    }
                 }
             }
             }

@@ -51,8 +51,9 @@ class MissionActivity : ComponentActivity() {
                                     AlarmClockDisplay(compact = compactClock)
                                     Text(if (current.quiet) "입력 없으면 ${current.alarm.quietSeconds}초 후 다시 울림" else "화면을 누르면 잠시 조용해집니다", color = Muted)
                                     if (current.preview) OutlinedButton(onClick = { RingService.instance?.stopPreview(); finish() }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) { Text("미리보기 닫기") }
-                                    else if (current.used < current.alarm.snoozeLimit) OutlinedButton(onClick = { RingService.instance?.snooze() }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
-                                        Text("${current.alarm.snoozeMinutes}분 뒤 다시 울림 · ${current.alarm.snoozeLimit - current.used}회 남음", textAlign = TextAlign.Center)
+                                    else if (SnoozePolicy.canSnooze(current.alarm.snoozeLimit, current.used)) OutlinedButton(onClick = { RingService.instance?.snooze() }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
+                                        val remaining = if (current.alarm.snoozeLimit == SnoozePolicy.UNLIMITED) "무제한" else "${current.alarm.snoozeLimit - current.used}회 남음"
+                                        Text("${current.alarm.snoozeMinutes}분 뒤 다시 울림 · $remaining", textAlign = TextAlign.Center)
                                     }
                                 }
                             }
